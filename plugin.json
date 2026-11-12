@@ -1,0 +1,27 @@
+{
+  "id": "neodex.pixelfont",
+  "name": "PixelFont",
+  "version": "1.0.0",
+  "author": "NDesumeur",
+  "description": "Dessine ta police pixel art lettre par lettre (125 caractères, accents français et € compris) sur une grille jusqu'à 16 × 16, avec largeur propre à chaque lettre, ligne de base, miroir, décalage, copier-coller et annuler. Pars d'une police du système ou d'une page blanche, regarde l'aperçu en direct, et exporte une vraie police TrueType (.ttf) à installer dans Windows, ou une planche PNG + JSON pour tes jeux.",
+  "icon": "icon.png",
+  "entry": "index.js",
+  "view": "pixelfont",
+  "neobase": ">=4.0.0",
+  "type": "app",
+  "category": "Outils",
+  "mobile": true,
+  "compatibility": [
+    "windows",
+    "android",
+    "linux"
+  ],
+  "syncMode": "fusion",
+  "syncInfo": "Toutes les lettres dessinées, les réglages et le texte d'aperçu.",
+  "system": false,
+  "dependencies": {},
+  "sdk": "2.1.0",
+  "permissions": [
+    "storage"
+  ]
+}
