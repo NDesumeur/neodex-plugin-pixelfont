@@ -2,26 +2,26 @@
 // dans Windows, ou en planche PNG + JSON pour un jeu. La police .ttf est fabriquée ici, table par table (glyf, cmap, hmtx…),
 // puis chargée par le navigateur lui-même pour l'aperçu : s'il l'accepte, Windows l'acceptera aussi.
 const CSS = `
-.pfGrid{display:grid;grid-template-columns:260px minmax(0,1fr) 280px;gap:12px}
+.pfGrid{display:grid;grid-template-columns:clamp(260px,20vw,380px) minmax(0,1fr) clamp(280px,22vw,420px);gap:clamp(12px,1.2vw,22px)}
 @media (max-width:1100px){.pfGrid{grid-template-columns:minmax(0,1fr) 280px}.pfGrid>:first-child{grid-column:1/-1;order:3}}
 @media (max-width:760px){.pfGrid{grid-template-columns:minmax(0,1fr)}.pfGrid>:first-child{order:3}}
-.pfChars{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px;max-height:520px;overflow:auto}
+.pfChars{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(34px,2.6vw,50px),1fr));gap:4px;max-height:max(520px,calc(100vh - 260px));overflow:auto}
 @media (max-width:1100px){.pfChars{max-height:260px}}
 .pfCh{position:relative;padding:2px;background:var(--bg0);border:2px solid var(--line);cursor:var(--cp,pointer);display:flex;flex-direction:column;align-items:center}
 .pfCh.on{border-color:var(--magenta)}
-.pfCh canvas{image-rendering:pixelated;width:24px;height:30px}
-.pfCh span{font:10px monospace;color:var(--muted)}
+.pfCh canvas{image-rendering:pixelated;width:clamp(24px,1.9vw,36px);height:auto}
+.pfCh span{font:12px monospace;color:var(--muted)}
 .pfCh.empty canvas{opacity:.25}
-.pfEd{width:100%;max-width:340px;display:block;margin:0 auto;image-rendering:pixelated;background:#0b0816;border:2px solid var(--line);touch-action:none;cursor:crosshair}
+.pfEd{width:100%;max-width:clamp(340px,calc(100vh - 360px),640px);display:block;margin:0 auto;image-rendering:pixelated;background:#0b0816;border:2px solid var(--line);touch-action:none;cursor:crosshair}
 .pfRow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
-.pfRow .btn{width:auto;margin:0;padding:4px 10px}
+.pfRow .btn{width:auto;margin:0;padding:6px 12px;font-size:15px}
 .pfRow .f{width:auto;flex:1;min-width:0;margin:0}
-.pfNum{width:60px!important;flex:none!important}
-.pfBig{font:28px monospace;color:#fff;text-align:center;margin:4px 0}
+.pfNum{width:70px!important;flex:none!important}
+.pfBig{font:clamp(28px,2.4vw,44px) monospace;color:#fff;text-align:center;margin:4px 0}
 .pfPrev{width:100%;display:block;image-rendering:pixelated;background:#0b0816;border:2px solid var(--line);margin-top:6px}
-.pfOk{font-size:12px;margin-top:6px;color:#6ae06a}
+.pfOk{font-size:15px;margin-top:6px;color:#6ae06a}
 .pfOk.bad{color:#ffd34f}
-.pfTtf{font-size:26px;line-height:1.4;color:#fff;background:#0b0816;border:2px solid var(--line);padding:8px;margin-top:6px;word-break:break-word;min-height:60px}
+.pfTtf{font-size:clamp(26px,2.2vw,40px);line-height:1.4;color:#fff;background:#0b0816;border:2px solid var(--line);padding:8px;margin-top:6px;word-break:break-word;min-height:60px}
 `;
 const CHARS = [...' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~àâäçéèêëîïôöùûüÿœæÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒÆ€«»’…°'];
 // ---------- la fabrique de .ttf ----------
@@ -109,7 +109,7 @@ export default async function (ctx) {
   const glyph = c => font.glyphs[c] || (font.glyphs[c] = {w: Math.round(font.W / 2), r: Array(font.H).fill(0)});
   // ---------- l'interface ----------
   view.innerHTML = '';
-  const wrap = el('div', 'appWrap'), head = el('div', 'agHead'), lay = el('div', 'pfGrid'), colL = el('div', 'sysCard px'), colM = el('div', 'sysCard px'), colR = el('div', 'sysCard px');
+  const wrap = el('div', 'appWrap wide'), head = el('div', 'agHead'), lay = el('div', 'pfGrid'), colL = el('div', 'sysCard px'), colM = el('div', 'sysCard px'), colR = el('div', 'sysCard px');
   head.append(el('span', 'label', 'PixelFont · police pixel art')); lay.append(colL, colM, colR); wrap.append(head, lay); view.append(wrap);
   const chars = el('div', 'pfChars'); colL.append(el('span', 'label', 'Caractères'), chars);
   const big = el('div', 'pfBig'), ed = el('canvas', 'pfEd'), eg = ed.getContext('2d'), tools = el('div', 'pfRow'), tools2 = el('div', 'pfRow'), wRow = el('div', 'pfRow');

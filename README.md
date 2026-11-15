@@ -26,3 +26,5 @@ Nom de la police, largeur et hauteur de la grille, nombre de lignes sous la lign
 ## Données
 
 Les lettres, les réglages et le texte d'aperçu sont gardés dans le dossier du plugin. Autorisation : `storage` seulement.
+
+

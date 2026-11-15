@@ -26,3 +26,5 @@ Font name, grid width and height, rows below the baseline (for g, p, q, y), lett
 ## Data
 
 The letters, the settings and the preview text are kept in the plugin folder. Permission: `storage` only.
+
+
