@@ -1,9 +1,9 @@
 {
   "pluginId": "neodex.pixelfont",
   "repo": "NDesumeur/neodex-plugin-pixelfont",
-  "version": "1.0.1",
-  "sha256": "afa5c593b7ab1575c2a98ab900e06f2f7ddfc60a7490ab2df26b5f7971898d89",
-  "approvedAt": "2026-11-16T04:14:38.571Z",
+  "version": "1.0.2",
+  "sha256": "4612da1bd1bb624348b38e6af8661b9676814c4809ca9883b86d62ed555c1aab",
+  "approvedAt": "2026-11-16T16:38:50.772Z",
   "neobase": ">=4.0.0",
-  "signature": "cBjcLOGXo0py+eE3rbpZvqCqeZ320SppwrC18vYWPqCi6WDnPFBOGdV/E1tW1G5Z/t7U9ellp3W6MFq74JfvCA=="
+  "signature": "vu23t7BiYkBC6p9UdtsL/XisMxgJume55K4zIkfMZ0XoDS4d4gSCZBObTwWYXJswJt4xY1NQcSHe1Mdg12CCAQ=="
 }
