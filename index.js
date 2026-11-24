@@ -71,6 +71,10 @@ function buildTTF(font) {
   os2.i16(Math.round(asc * U * .6)); os2.i16(asc * U); os2.u16(0); os2.u16(32); os2.u16(1);
   const post = new B(); post.u32(0x30000); post.u32(0); post.i16(-U); post.i16(U); post.u32(0); post.u32(0); post.u32(0); post.u32(0); post.u32(0);
   const tables = {'OS/2': os2, cmap, glyf: glyfB, head, hhea, hmtx, loca, maxp, name: nm, post};
+  // le crénage : font.kern = {'AV': -1} en pixels, en table kern (format 0), que lisent Windows et les navigateurs
+  const gid = c => order.indexOf(c) + 1, pairs = Object.entries(font.kern || {}).filter(([p, v]) => v && [...p].length === 2 && gid(p[0]) > 0 && gid(p[1]) > 0).map(([p, v]) => [gid(p[0]), gid(p[1]), v * U]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (pairs.length) { const kern = new B(), np = pairs.length, sr2 = 2 ** Math.floor(Math.log2(np)) * 6; kern.u16(0); kern.u16(1); kern.u16(0); kern.u16(14 + np * 6); kern.u16(1);
+    kern.u16(np); kern.u16(sr2); kern.u16(Math.floor(Math.log2(np))); kern.u16(np * 6 - sr2); for (const [l, r, v] of pairs) { kern.u16(l); kern.u16(r); kern.i16(v); } tables.kern = kern; }
   const tags = Object.keys(tables).sort(), nt = tags.length, out = new B(), es = Math.floor(Math.log2(nt));
   out.u32(0x10000); out.u16(nt); out.u16(16 * 2 ** es); out.u16(es); out.u16(nt * 16 - 16 * 2 ** es);
   let off = 12 + nt * 16; const bodies = tags.map(t => { const b = tables[t].bytes(); const rec = [t, sum(b), off, b.length]; off += (b.length + 3) & ~3; return [rec, b]; });
@@ -78,6 +82,17 @@ function buildTTF(font) {
   let headAt = 0; bodies.forEach(([[t, , o], b]) => { if (t === 'head') headAt = o; out.raw(b); while (out.len % 4) out.u8(0); });
   const font8 = out.bytes(), adj = (0xb1b0afba - sum(font8)) >>> 0; new DataView(font8.buffer).setUint32(headAt + 8, adj);
   return font8;
+}
+// le WOFF : les mêmes tables, chacune compressée (zlib) quand elle y gagne ; c'est la police des sites web
+async function buildWOFF(ttf) {
+  const dv = new DataView(ttf.buffer, ttf.byteOffset, ttf.byteLength), nt = dv.getUint16(4), recs = [];
+  for (let i = 0; i < nt; i++) { const o = 12 + i * 16; recs.push({tag: dv.getUint32(o), cs: dv.getUint32(o + 4), off: dv.getUint32(o + 8), len: dv.getUint32(o + 12)}); }
+  for (const r of recs) { const raw = ttf.subarray(r.off, r.off + r.len), z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer()); r.data = z.length < raw.length ? z : raw; }
+  const out = new B(); let off = 44 + nt * 20; const total = off + recs.reduce((a, r) => a + ((r.data.length + 3) & ~3), 0);
+  out.u32(0x774f4646); out.u32(0x10000); out.u32(total); out.u16(nt); out.u16(0); out.u32(ttf.length); out.u16(1); out.u16(0); out.u32(0); out.u32(0); out.u32(0); out.u32(0); out.u32(0);
+  for (const r of recs) { out.u32(r.tag); out.u32(off); out.u32(r.data.length); out.u32(r.len); out.u32(r.cs); off += (r.data.length + 3) & ~3; }
+  for (const r of recs) { out.raw(r.data); while (out.len % 4) out.u8(0); }
+  return out.bytes();
 }
 function sum(b) { let s = 0; const n = Math.ceil(b.length / 4) * 4; for (let i = 0; i < n; i += 4) s = (s + ((b[i] || 0) << 24 | (b[i + 1] || 0) << 16 | (b[i + 2] || 0) << 8 | (b[i + 3] || 0))) >>> 0; return s; }
 class B { constructor() { this.a = []; } get len() { return this.a.length; } u8(v) { this.a.push(v & 255); } u16(v) { this.u8(v >> 8); this.u8(v); } i16(v) { this.u16(v & 0xffff); } u32(v) { this.u16(v >>> 16); this.u16(v & 0xffff); } raw(b) { for (const x of b) this.a.push(x); } bytes() { return Uint8Array.from(this.a); } }
@@ -102,7 +117,7 @@ export default async function (ctx) {
   const { el, toast } = ctx.host;
   ctx.host.addStyle(CSS);
   let data = null; try { data = await ctx.folder.read('pixelfont'); } catch {}
-  const font = {name: data?.name || 'Ma police pixel', W: data?.W || 8, H: data?.H || 12, desc: data?.desc ?? 3, spacing: data?.spacing ?? 1, glyphs: data?.glyphs || null};
+  const font = {name: data?.name || 'Ma police pixel', W: data?.W || 8, H: data?.H || 12, desc: data?.desc ?? 3, spacing: data?.spacing ?? 1, glyphs: data?.glyphs || null, kern: data?.kern || {}};
   if (!font.glyphs) font.glyphs = rasterize('monospace', font.W, font.H, font.desc);
   let curCh = data?.cur && CHARS.includes(data.cur) ? data.cur : 'A', sample = data?.sample || 'Portez ce vieux whisky au juge blond qui fume.\nTHE QUICK BROWN FOX 0123456789 !?', scale = data?.scale || 3;
   let saveT = 0; const save = () => { clearTimeout(saveT); saveT = setTimeout(() => ctx.folder.write('pixelfont', {...font, cur: curCh, sample, scale}).catch(() => {}), 500); };
@@ -173,7 +188,11 @@ export default async function (ctx) {
     const start = el('select', 'f'); start.append(el('option', '', 'Repartir d\'une police…')); for (const [v, t] of [['monospace', 'Chasse fixe'], ['sans-serif', 'Sans empattement'], ['serif', 'Avec empattement']]) { const o = el('option', '', t); o.value = v; start.append(o); }
     start.onchange = async () => { const v = start.value; start.selectedIndex = 0; if (!['monospace', 'sans-serif', 'serif'].includes(v)) return; if (!(await ctx.host.confirm?.('Remplacer toutes les lettres par celles de cette police ?') ?? true)) return; font.glyphs = rasterize(v, font.W, font.H, font.desc); undo.length = 0; changed(true); };
     settings.append(r1, num('Largeur max', 'W', 3, 16, 'Largeur de la grille d\'une lettre'), num('Hauteur', 'H', 5, 16), num('Sous la ligne', 'desc', 0, 6, 'Lignes sous la ligne de base (pour g, p, q, y…)'), num('Espace entre lettres', 'spacing', 0, 4), start);
-    const exp = el('div', 'pfRow'); exp.append(btn('Exporter .ttf', exportTTF), btn('Planche PNG + JSON', exportPNG)); settings.append(exp);
+    // le crénage : une paire de lettres et son décalage en pixels (négatif : plus serrées)
+    const kp = el('input', 'f pfNum'), kv = el('input', 'f pfNum'), kr = el('div', 'pfRow'), kl = el('div', 'pfRow'); kp.maxLength = 2; kp.placeholder = 'AV'; kp.title = 'Deux lettres'; kp.translate = false; kv.type = 'number'; kv.min = -4; kv.max = 4; kv.value = -1; kv.title = 'Pixels : négatif pour rapprocher';
+    kr.append(el('span', 'hint', 'Crénage'), kp, kv, btn('+', () => { const p = [...kp.value]; if (p.length !== 2) return toast('Écris deux lettres, par exemple AV'); const v = Math.max(-4, Math.min(4, Math.round(+kv.value) || 0)); if (v) font.kern[p.join('')] = v; else delete font.kern[p.join('')]; kp.value = ''; changed(true); }));
+    kl.append(...Object.entries(font.kern).map(([p, v]) => { const b = btn(p + ' ' + (v > 0 ? '+' : '') + v + ' ✕', () => { delete font.kern[p]; changed(true); }); b.title = 'Retirer ce crénage'; b.translate = false; return b; }));
+    const exp = el('div', 'pfRow'); exp.append(btn('Exporter .ttf', exportTTF), btn('Exporter .woff', exportWOFF), btn('Planche PNG + JSON', exportPNG)); settings.append(kr, kl, exp);
   }
   function resize(key, v) {
     pushUndo(); const old = {...font}; font[key] = v;
@@ -183,12 +202,17 @@ export default async function (ctx) {
   }
   // ---------- l'aperçu en pixels (dessiné directement) et la vraie police .ttf ----------
   function drawPreview() {
-    const lines = sample.split('\n'), lh = font.H + 2, wOf = s => [...s].reduce((a, c) => a + (font.glyphs[c]?.w ?? Math.round(font.W / 2)) + font.spacing, 0);
+    const lines = sample.split('\n'), lh = font.H + 2, kOf = (a, b) => font.kern[a + b] || 0, wOf = s => [...s].reduce((a, c, i, l) => a + (font.glyphs[c]?.w ?? Math.round(font.W / 2)) + font.spacing + kOf(c, l[i + 1]), 0);
     const pw = Math.max(40, ...lines.map(wOf)) + 4, ph = lines.length * lh + 4, avail = Math.max(1, Math.floor((colR.clientWidth - 30) / pw)), s = Math.max(1, Math.min(scale, avail));
     prev.width = pw * s; prev.height = ph * s; pg.fillStyle = '#0b0816'; pg.fillRect(0, 0, prev.width, prev.height); pg.fillStyle = '#fff';
-    lines.forEach((l, li) => { let x = 2; for (const c of l) { const g = font.glyphs[c]; if (g) for (let y = 0; y < font.H; y++) for (let k = 0; k < g.w; k++) if (g.r[y] >> k & 1) pg.fillRect((x + k) * s, (2 + li * lh + y) * s, s, s); x += (g?.w ?? Math.round(font.W / 2)) + font.spacing; } });
+    lines.forEach((l, li) => { let x = 2, ci = 0; const L = [...l]; for (const c of L) { ci++; const g = font.glyphs[c]; if (g) for (let y = 0; y < font.H; y++) for (let k = 0; k < g.w; k++) if (g.r[y] >> k & 1) pg.fillRect((x + k) * s, (2 + li * lh + y) * s, s, s); x += (g?.w ?? Math.round(font.W / 2)) + font.spacing + kOf(c, L[ci] ?? ''); } });
   }
   prevTxt.oninput = () => { sample = prevTxt.value; save(); drawPreview(); };
+  // les phrases-test : toutes les lettres, les chiffres, les paires à créner
+  const SAMPLES = {'Phrases-test…': '', 'Toutes les lettres (français)': 'Portez ce vieux whisky au juge blond qui fume.\nVoyez le brick géant que j\'examine près du wharf.', 'All letters (English)': 'The quick brown fox jumps over the lazy dog.\nPACK MY BOX WITH FIVE DOZEN LIQUOR JUGS', 'Alphabet et chiffres': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789 .,;:!?()+-=', 'Paires à créner': 'AV AW AY AT LT LY TA To Te Ty VA Va Ve WA Wa YA Ya\nFA PA rv ry fo f. r. y. LV'};
+  const sampSel = el('select', 'f'); for (const k in SAMPLES) { const o = el('option', '', k); o.value = k; sampSel.append(o); }
+  sampSel.onchange = () => { const v = SAMPLES[sampSel.value]; sampSel.selectedIndex = 0; if (!v) return; sample = prevTxt.value = v; save(); drawPreview(); };
+  prevTxt.before(sampSel);
   let ttfN = 0, ttfT = 0, lastFace = null;
   function ttfCheck() { clearTimeout(ttfT); ttfT = setTimeout(async () => {
     const id = ++ttfN; let bytes;
@@ -201,6 +225,7 @@ export default async function (ctx) {
   const download = (href, name) => { const a = el('a'); a.href = href; a.download = name; document.body.append(a); a.click(); a.remove(); };
   const fname = () => (font.name || 'police').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '') || 'police';
   function exportTTF() { const b = buildTTF(font); download(URL.createObjectURL(new Blob([b], {type: 'font/ttf'})), fname() + '.ttf'); toast('Double-clique sur le fichier pour l\'installer dans Windows'); }
+  async function exportWOFF() { const b = await buildWOFF(buildTTF(font)); download(URL.createObjectURL(new Blob([b], {type: 'font/woff'})), fname() + '.woff'); toast('Police .woff enregistrée : pour un site web (@font-face)'); }
   function exportPNG() {
     const cols = 16, rows = Math.ceil(CHARS.length / cols), c = document.createElement('canvas'), g = c.getContext('2d'); c.width = cols * font.W; c.height = rows * font.H; g.fillStyle = '#fff';
     const meta = {name: font.name, cellWidth: font.W, cellHeight: font.H, baseline: font.H - font.desc, spacing: font.spacing, columns: cols, chars: {}};
@@ -216,4 +241,5 @@ export default async function (ctx) {
   function changed(all) { save(); if (all) { drawChars(); drawSettings(); } else drawThumb(curCh); drawEditor(); drawPreview(); ttfCheck(); }
   function full() { CHARS.forEach(c => thumbs[c]?.classList.toggle('on', c === curCh)); drawEditor(); thumbs[curCh]?.scrollIntoView?.({block: 'nearest'}); }
   drawChars(); drawSettings(); drawEditor(); drawPreview(); ttfCheck();
+  view.__pf = {font, buildTTF, buildWOFF, changed};  // pour le test « local »
 }
